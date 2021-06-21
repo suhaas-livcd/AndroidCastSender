@@ -1,26 +1,28 @@
 package com.idlikadai.androidcastsender;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.mediarouter.app.MediaRouteButton;
-
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.view.Menu;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.Toast;
 
-import com.google.android.gms.cast.Cast;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.mediarouter.app.MediaRouteButton;
+
 import com.google.android.gms.cast.MediaInfo;
 import com.google.android.gms.cast.MediaLoadRequestData;
 import com.google.android.gms.cast.MediaMetadata;
 import com.google.android.gms.cast.framework.CastButtonFactory;
 import com.google.android.gms.cast.framework.CastContext;
 import com.google.android.gms.cast.framework.CastSession;
+import com.google.android.gms.cast.framework.CastState;
 import com.google.android.gms.cast.framework.Session;
 import com.google.android.gms.cast.framework.SessionManager;
 import com.google.android.gms.cast.framework.SessionManagerListener;
 import com.google.android.gms.cast.framework.media.RemoteMediaClient;
+import com.google.android.gms.common.images.WebImage;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -47,40 +49,40 @@ public class MainActivity extends AppCompatActivity {
         mMediaRouteButton = (MediaRouteButton) findViewById(R.id.media_route_button);
         CastButtonFactory.setUpMediaRouteButton(getApplicationContext(), mMediaRouteButton);
 
-
         mPlayPauseButton = (ImageButton) findViewById(R.id.media_button);
-
-        mediaPlayer = MediaPlayer.create(this,
-                Settings.System.DEFAULT_RINGTONE_URI);
-
-
 
 
         mPlayPauseButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(mediaPlayer.isPlaying()){
-                    mPlayPauseButton.setImageResource(R.drawable.ic_play_arrow_black_24dp);
-                    mediaPlayer.pause();
-                }else{
-                    mPlayPauseButton.setImageResource(R.drawable.ic_pause_black_24dp);
-                    MediaMetadata metadata = new MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK);
+                if (mCastContext.getCastState() == CastState.CONNECTED) {
+                    final RemoteMediaClient remoteMediaClient = mCastContext.getSessionManager().getCurrentCastSession().getRemoteMediaClient();
+                    if (remoteMediaClient.isPlaying()) {
+                        mPlayPauseButton.setImageResource(R.drawable.ic_play_arrow_black_24dp);
+                        remoteMediaClient.pause();
+                    } else {
+                        mPlayPauseButton.setImageResource(R.drawable.ic_pause_black_24dp);
+                        if (remoteMediaClient.isPaused()) {
+                            remoteMediaClient.play();
+                        } else {
+                            MediaMetadata metadata = new MediaMetadata(MediaMetadata.MEDIA_TYPE_GENERIC);
+                            metadata.putString(MediaMetadata.KEY_TITLE, "Sample Music");
+                            metadata.putString(MediaMetadata.KEY_SUBTITLE, "Sound Helix");
+                            metadata.addImage(new WebImage(Uri.parse("https://homepages.cae.wisc.edu/~ece533/images/airplane.png")));
 
-                    metadata.putString(MediaMetadata.KEY_TITLE, "Ringtone");
-                    metadata.putString(MediaMetadata.KEY_SUBTITLE, "Retro Ring");
+                            MediaInfo mediaInfo = new MediaInfo.Builder("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3")
+                                    .setContentType("audio/mp3")
+                                    .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+                                    .setMetadata(metadata)
+                                    .build();
+                            remoteMediaClient.load(mediaInfo, true, 0);
+                            MediaLoadRequestData mediaLoadRequestData = new MediaLoadRequestData.Builder().setMediaInfo(mediaInfo).build();
+                            remoteMediaClient.load(mediaLoadRequestData);
+                        }
+                    }
 
-                    MediaInfo mediaInfo = new MediaInfo.Builder("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3")
-                            .setContentType("audio/mp3")
-                            .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                            .setMetadata(metadata)
-                            .build();
-                    RemoteMediaClient remoteMediaClient = mCastContext.getSessionManager().getCurrentCastSession().getRemoteMediaClient();
-                    remoteMediaClient.load(mediaInfo, true, 0);
-
-                    MediaLoadRequestData mediaLoadRequestData = new MediaLoadRequestData.Builder().setMediaInfo(mediaInfo).build();
-                    remoteMediaClient.load(mediaLoadRequestData);
-
-                    mediaPlayer.start();
+                } else {
+                    Toast.makeText(getApplicationContext(),"CAST NOT CONNECTED",Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -94,6 +96,7 @@ public class MainActivity extends AppCompatActivity {
         mSessionManager.addSessionManagerListener(mSessionManagerListener);
         super.onResume();
     }
+
     @Override
     protected void onPause() {
         super.onPause();
@@ -148,7 +151,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onSessionEnded(Session session, int error) {
-            finish();
+//            finish();
         }
 
         @Override
